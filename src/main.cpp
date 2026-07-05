@@ -17,6 +17,7 @@
 #include "shader.hpp"
 #include "task_processor.hpp"
 #include "tileset.hpp"
+#include <geonames_imgui.hpp>
 
 static SDL_Window* window;
 static SDL_GPUDevice* device;
@@ -632,6 +633,14 @@ static void Render()
             else
             {
                 SDL_Log("Failed to create tileset");
+            }
+        }
+        ImGui::SeparatorText("Search");
+        {
+            std::optional<GeoNames> result = GetImGuiGeoNames();
+            if (result.has_value())
+            {
+                camera.Focus(result->Latitude, result->Longitude);
             }
         }
         ImGui::End();

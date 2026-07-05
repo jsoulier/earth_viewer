@@ -23,6 +23,7 @@ public:
     uint32_t GetHeight() const;
     double GetAspectRatio() const;
     double GetFovX() const;
+    void Focus(double latitude, double longitude);
 
 private:
     glm::dvec3 Target;

@@ -13,14 +13,12 @@ make_directory(${BINARY_DIR})
 configure_file(LICENSE.txt ${BINARY_DIR} COPYONLY)
 configure_file(README.md ${BINARY_DIR} COPYONLY)
 
-# https://github.com/CesiumGS/cesium-native/issues/1214
-set(VCPKG_PLATFORM_TOOLSET_VERSION "14.38")
-
 set(CESIUM_TESTS_ENABLED OFF)
 set(GLM_BUILD_LIBRARY OFF)
 
 add_subdirectory(lib/SDL)
 add_subdirectory(lib/cesium-native)
+add_subdirectory(lib/geonames)
 add_subdirectory(lib/glm)
 add_subdirectory(lib/imgui)
 add_subdirectory(lib/json)
@@ -42,6 +40,7 @@ target_link_libraries(sdl_earth_viewer PRIVATE
     CesiumQuantizedMeshTerrain
     CesiumUtility
     SDL3::SDL3
+    geonames
     glm::glm
     imgui
     nlohmann_json

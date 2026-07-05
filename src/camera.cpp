@@ -134,3 +134,10 @@ double SDLCamera::GetFovX() const
 {
     return 2.0 * std::atan(std::tan(kFovY / 2.0) * GetAspectRatio());
 }
+
+void SDLCamera::Focus(double latitude, double longitude)
+{
+    Target = glm::dvec3(0.0, 0.0, 0.0);
+    Pitch = glm::radians(latitude);
+    Yaw = glm::radians(longitude);
+}
