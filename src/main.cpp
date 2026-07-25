@@ -17,13 +17,14 @@
 #include "shader.hpp"
 #include "task_processor.hpp"
 #include "tileset.hpp"
-#include <geonames_imgui.hpp>
+
+static constexpr double kSunPitch = glm::radians(20.0);
+static constexpr double kSunYaw = glm::radians(40.0);
 
 static SDL_Window* window;
 static SDL_GPUDevice* device;
 static SDL_GPUTexture* depthTexture;
 static SDL_GPUGraphicsPipeline* tilesetPipeline;
-static SDL_GPUGraphicsPipeline* axesPipeline;
 static SDL_GPUGraphicsPipeline* atmospherePipeline;
 static SDL_GPUGraphicsPipeline* spacePipeline;
 static SDL_GPUTexture* defaultTexture;
@@ -32,13 +33,9 @@ static std::shared_ptr<SDLPrepareRendererResources> prepareRendererResources;
 static SDLTilesetConfig tilesetConfig;
 static std::shared_ptr<SDLTileset> tileset;
 static SDLCamera camera;
-static glm::vec3 sunDirection = glm::normalize(glm::vec3(1.0f, 1.0f, 1.0f));
 static uint64_t time1;
 static uint64_t time2;
 static float dt;
-static bool drawDebugAxes = false;
-static bool drawAtmosphere = true;
-static bool drawSpace = true;
 
 static bool CreateTilesetPipeline()
 {
@@ -80,30 +77,6 @@ static bool CreateTilesetPipeline()
     SDL_ReleaseGPUShader(device, info.vertex_shader);
     SDL_ReleaseGPUShader(device, info.fragment_shader);
     return tilesetPipeline != nullptr;
-}
-
-static bool CreateAxesPipeline()
-{
-    SDL_GPUColorTargetDescription targets[1]{};
-    targets[0].format = SDL_GetGPUSwapchainTextureFormat(device, window);
-    SDL_GPUGraphicsPipelineCreateInfo info{};
-    info.vertex_shader = LoadShader(device, "axes.vert");
-    info.fragment_shader = LoadShader(device, "axes.frag");
-    info.target_info.num_color_targets = 1;
-    info.target_info.color_target_descriptions = targets;
-    info.target_info.has_depth_stencil_target = true;
-    info.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
-    info.depth_stencil_state.enable_depth_test = true;
-    info.depth_stencil_state.enable_depth_write = true;
-    info.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_GREATER;
-    info.primitive_type = SDL_GPU_PRIMITIVETYPE_LINELIST;
-    if (info.vertex_shader && info.fragment_shader)
-    {
-        axesPipeline = SDL_CreateGPUGraphicsPipeline(device, &info);
-    }
-    SDL_ReleaseGPUShader(device, info.vertex_shader);
-    SDL_ReleaseGPUShader(device, info.fragment_shader);
-    return axesPipeline != nullptr;
 }
 
 static bool CreateAtmospherePipeline()
@@ -252,17 +225,10 @@ static bool Init()
         SDL_Log("Failed to create window: %s", SDL_GetError());
         return false;
     }
-    SDL_GPUShaderFormat shaderFormats = 0
-        | SDL_GPU_SHADERFORMAT_SPIRV
-        | SDL_GPU_SHADERFORMAT_MSL
-#if !USE_DEBUG_GROUPS
-        | SDL_GPU_SHADERFORMAT_DXIL
-#endif
-        ;
 #ifndef NDEBUG
-    device = SDL_CreateGPUDevice(shaderFormats, true, nullptr);
+    device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_MSL, true, nullptr);
 #else
-    device = SDL_CreateGPUDevice(shaderFormats, false, nullptr);
+    device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_MSL, false, nullptr);
 #endif
     if (!device)
     {
@@ -294,11 +260,6 @@ static bool Init()
     if (!CreateTilesetPipeline())
     {
         SDL_Log("Failed to create tileset pipeline");
-        return false;
-    }
-    if (!CreateAxesPipeline())
-    {
-        SDL_Log("Failed to create axes pipeline");
         return false;
     }
     if (!CreateAtmospherePipeline())
@@ -333,7 +294,6 @@ static void Quit()
     tileset.reset();
     prepareRendererResources.reset();
     SDL_ReleaseGPUGraphicsPipeline(device, tilesetPipeline);
-    SDL_ReleaseGPUGraphicsPipeline(device, axesPipeline);
     SDL_ReleaseGPUGraphicsPipeline(device, atmospherePipeline);
     SDL_ReleaseGPUGraphicsPipeline(device, spacePipeline);
     SDL_ReleaseGPUTexture(device, depthTexture);
@@ -358,10 +318,9 @@ static bool Poll()
         {
             camera.Handle(event);
         }
-        switch (event.type)
+        if (event.type == SDL_EVENT_QUIT)
         {
-            case SDL_EVENT_QUIT:
-                return false;
+            return false;
         }
     }
     return true;
@@ -418,35 +377,17 @@ static void Render()
         SDL_SubmitGPUCommandBuffer(commandBuffer);
         return;
     }
-    const glm::dmat4 viewMatrix = camera.GetViewMatrix();
-    const glm::dmat4 projMatrix = camera.GetProjMatrix();
-    const glm::dmat4 viewProjMatrix = projMatrix * viewMatrix;
-    const glm::mat4 inverseViewProj = glm::inverse(glm::mat4(viewProjMatrix));
-    const glm::vec4 cameraPosition = glm::vec4(camera.GetPosition(), 1.0f);
-    {
-        SDL_GPUColorTargetInfo colorInfo{};
-        colorInfo.texture = swapchainTexture;
-        colorInfo.load_op = SDL_GPU_LOADOP_CLEAR;
-        colorInfo.store_op = SDL_GPU_STOREOP_STORE;
-        colorInfo.clear_color = { 0.0f, 0.0f, 0.0f, 1.0f };
-        SDL_GPUDepthStencilTargetInfo depthInfo{};
-        depthInfo.texture = depthTexture;
-        depthInfo.load_op = SDL_GPU_LOADOP_CLEAR;
-        depthInfo.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
-        depthInfo.store_op = SDL_GPU_STOREOP_STORE;
-        depthInfo.clear_depth = 0.0f;
-        SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(commandBuffer, &colorInfo, 1, &depthInfo);
-        if (renderPass)
-        {
-            SDL_EndGPURenderPass(renderPass);
-        }
-    }
-    if (drawSpace)
+    glm::dmat4 viewMatrix = camera.GetViewMatrix();
+    glm::dmat4 projMatrix = camera.GetProjMatrix();
+    glm::dmat4 viewProjMatrix = projMatrix * viewMatrix;
+    glm::mat4 inverseViewProj = glm::inverse(glm::mat4(viewProjMatrix));
+    glm::vec4 cameraPosition = glm::vec4(camera.GetPosition(), 1.0f);
+    glm::vec3 sunDirection = glm::vec3(SDLCamera::EulerToDirection(camera.GetPitch() + kSunPitch, camera.GetYaw() + kSunYaw));
     {
         DebugGroupBlock(commandBuffer, "Render::Space");
         SDL_GPUColorTargetInfo colorInfo{};
         colorInfo.texture = swapchainTexture;
-        colorInfo.load_op = SDL_GPU_LOADOP_LOAD;
+        colorInfo.load_op = SDL_GPU_LOADOP_CLEAR;
         colorInfo.store_op = SDL_GPU_STOREOP_STORE;
         SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(commandBuffer, &colorInfo, 1, nullptr);
         if (renderPass)
@@ -466,9 +407,11 @@ static void Render()
         colorInfo.store_op = SDL_GPU_STOREOP_STORE;
         SDL_GPUDepthStencilTargetInfo depthInfo{};
         depthInfo.texture = depthTexture;
-        depthInfo.load_op = SDL_GPU_LOADOP_LOAD;
-        depthInfo.stencil_load_op = SDL_GPU_LOADOP_LOAD;
+        depthInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+        depthInfo.stencil_load_op = SDL_GPU_LOADOP_CLEAR;
         depthInfo.store_op = SDL_GPU_STOREOP_STORE;
+        depthInfo.clear_depth = 0.0f;
+        depthInfo.cycle = true;
         SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(commandBuffer, &colorInfo, 1, &depthInfo);
         if (!renderPass)
         {
@@ -503,8 +446,8 @@ static void Render()
                 }
                 for (const SDLPrepareRendererResourcesPrimitive& primitive : resources->Primitives)
                 {
-                    const glm::mat4 mvp = glm::mat4(viewProjMatrix * primitive.Transform);
-                    const glm::mat4 model = glm::mat4(primitive.Transform);
+                    glm::mat4 mvp = glm::mat4(viewProjMatrix * primitive.Transform);
+                    glm::mat4 model = glm::mat4(primitive.Transform);
                     glm::vec4 rasterData = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
                     int32_t tileType = -1;
                     if (primitive.BaseColorTexture)
@@ -546,28 +489,8 @@ static void Render()
                 }
             }
         }
-        if (drawDebugAxes)
-        {
-            DebugGroupBlock(commandBuffer, "Render::DebugAxes");
-            SDL_BindGPUGraphicsPipeline(renderPass, axesPipeline);
-            const double kAxisLength = 1e10;
-            static const glm::dvec3 kPositions[6] =
-            {
-                glm::dvec3(-kAxisLength, 0.0, 0.0), glm::dvec3(kAxisLength, 0.0, 0.0),
-                glm::dvec3(0.0, -kAxisLength, 0.0), glm::dvec3(0.0, kAxisLength, 0.0),
-                glm::dvec3(0.0, 0.0, -kAxisLength), glm::dvec3(0.0, 0.0, kAxisLength)
-            };
-            glm::vec4 positions[6];
-            for (int i = 0; i < 6; ++i)
-            {
-                positions[i] = glm::vec4(viewProjMatrix * glm::dvec4(kPositions[i], 1.0));
-            }
-            SDL_PushGPUVertexUniformData(commandBuffer, 0, positions, sizeof(positions));
-            SDL_DrawGPUPrimitives(renderPass, 6, 1, 0, 0);
-        }
         SDL_EndGPURenderPass(renderPass);
     }
-    if (drawAtmosphere)
     {
         DebugGroupBlock(commandBuffer, "Render::Atmosphere");
         SDL_GPUColorTargetInfo colorInfo{};
@@ -596,10 +519,7 @@ static void Render()
         ImGui::Text("GPU: %s", SDL_GetStringProperty(properties, SDL_PROP_GPU_DEVICE_NAME_STRING, "Unknown"));
         ImGui::Text("Driver: %s", SDL_GetGPUDeviceDriver(device));
         ImGui::Text("FPS: %.1f (%.2f ms)", 1e9f / dt, dt / 1e6f);
-        glm::dvec3 position = camera.GetPosition();
-        glm::dvec3 target = camera.GetTarget();
-        ImGui::Text("Position: %.1f, %.1f, %.1f", position.x, position.y, position.z);
-        ImGui::Text("Target:   %.1f, %.1f, %.1f", target.x, target.y, target.z);
+        ImGui::Text("Position: %.1f, %.1f, %.1f", cameraPosition.x, cameraPosition.y, cameraPosition.z);
         ImGui::Text("Distance: %.1f km", camera.GetDistance() / 1e3);
         ImGui::Text("Pitch: %.2f, Yaw: %.2f", glm::degrees(camera.GetPitch()), glm::degrees(camera.GetYaw()));
         if (tileset)
@@ -610,19 +530,7 @@ static void Render()
         {
             ImGui::TextDisabled("No active tileset.");
         }
-        ImGui::SeparatorText("Environment");
-        ImGui::TextDisabled("Red: X, Green: Y, Blue: Z");
-        ImGui::Checkbox("Draw Axes", &drawDebugAxes);
-        ImGui::Checkbox("Draw Space", &drawSpace);
-        ImGui::Checkbox("Draw Atmosphere", &drawAtmosphere);
-        if (ImGui::DragFloat3("Sun Direction", &sunDirection.x, 0.01f, -1.0f, 1.0f))
-        {
-            if (glm::length(sunDirection) > 0.001f)
-            {
-                sunDirection = glm::normalize(sunDirection);
-            }
-        }
-        ImGui::SeparatorText("Tileset");
+        ImGui::SeparatorText("Tileset Config");
         if (tilesetConfig.RenderImGui())
         {
             std::shared_ptr<SDLTileset> newTileset = SDLTileset::Create(tilesetConfig);
@@ -633,14 +541,6 @@ static void Render()
             else
             {
                 SDL_Log("Failed to create tileset");
-            }
-        }
-        ImGui::SeparatorText("Search");
-        {
-            std::optional<GeoNames> result = GetImGuiGeoNames();
-            if (result.has_value())
-            {
-                camera.Focus(result->Latitude, result->Longitude);
             }
         }
         ImGui::End();

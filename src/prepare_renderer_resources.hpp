@@ -43,6 +43,7 @@ class SDLPrepareRendererResources : public Cesium3DTilesSelection::IPrepareRende
 {
 public:
     SDLPrepareRendererResources(SDL_GPUDevice* device);
+    CesiumGltf::Ktx2TranscodeTargets GetKtx2TranscodeTargets() const;
     CesiumAsync::Future<Cesium3DTilesSelection::TileLoadResultAndRenderResources> prepareInLoadThread(
         const CesiumAsync::AsyncSystem& asyncSystem,
         Cesium3DTilesSelection::TileLoadResult&& tileLoadResult,

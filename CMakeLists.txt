@@ -15,13 +15,15 @@ configure_file(README.md ${BINARY_DIR} COPYONLY)
 
 set(CESIUM_TESTS_ENABLED OFF)
 set(GLM_BUILD_LIBRARY OFF)
+set(TF_BUILD_EXAMPLES OFF)
+set(TF_BUILD_TESTS OFF)
 
 add_subdirectory(lib/SDL)
 add_subdirectory(lib/cesium-native)
-add_subdirectory(lib/geonames)
 add_subdirectory(lib/glm)
 add_subdirectory(lib/imgui)
 add_subdirectory(lib/json)
+add_subdirectory(lib/taskflow)
 add_executable(sdl_earth_viewer WIN32
     src/camera.cpp
     src/debug_group.cpp
@@ -40,7 +42,7 @@ target_link_libraries(sdl_earth_viewer PRIVATE
     CesiumQuantizedMeshTerrain
     CesiumUtility
     SDL3::SDL3
-    geonames
+    Taskflow::Taskflow
     glm::glm
     imgui
     nlohmann_json
@@ -89,6 +91,7 @@ target_precompile_headers(sdl_earth_viewer PRIVATE
     <spdlog/spdlog.h>
     <string>
     <string_view>
+    <taskflow/taskflow.hpp>
     <thread>
     <utility>
     <variant>
@@ -100,7 +103,6 @@ function(add_shader FILE)
     set(DEPENDS ${ARGN})
     set(HLSL ${CMAKE_SOURCE_DIR}/shaders/${FILE})
     set(SPV ${CMAKE_SOURCE_DIR}/shaders/bin/${FILE}.spv)
-    set(DXIL ${CMAKE_SOURCE_DIR}/shaders/bin/${FILE}.dxil)
     set(MSL ${CMAKE_SOURCE_DIR}/shaders/bin/${FILE}.msl)
     set(JSON ${CMAKE_SOURCE_DIR}/shaders/bin/${FILE}.json)
     function(compile OUTPUT)
@@ -119,7 +121,6 @@ function(add_shader FILE)
     endfunction()
     if (EXISTS ${SHADERCROSS})
         compile(${SPV})
-        compile(${DXIL})
         compile(${MSL})
         compile(${JSON})
     else()
@@ -140,9 +141,6 @@ function(add_shader FILE)
         add_custom_target(${NAME} DEPENDS ${BINARY})
         add_dependencies(sdl_earth_viewer ${NAME})
     endfunction()
-    if(WIN32)
-        package(${DXIL})
-    endif()
     if(APPLE)
         package(${MSL})
     else()
@@ -151,8 +149,6 @@ function(add_shader FILE)
     package(${JSON})
 endfunction()
 add_shader(atmosphere.frag)
-add_shader(axes.frag)
-add_shader(axes.vert)
 add_shader(fullscreen.vert)
 add_shader(space.frag)
 add_shader(tileset.frag)

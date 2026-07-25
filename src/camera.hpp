@@ -9,13 +9,11 @@ class SDLCamera
 public:
     SDLCamera();
     void Handle(const SDL_Event& event);
-    void Resize(uint32_t width, uint32_t height);
-    bool IsValid() const;
+    void Resize(int width, int height);
     Cesium3DTilesSelection::ViewState GetViewState() const;
     glm::dmat4 GetProjMatrix() const;
     glm::dmat4 GetViewMatrix() const;
     glm::dvec3 GetPosition() const;
-    glm::dvec3 GetTarget() const;
     double GetDistance() const;
     double GetPitch() const;
     double GetYaw() const;
@@ -23,10 +21,14 @@ public:
     uint32_t GetHeight() const;
     double GetAspectRatio() const;
     double GetFovX() const;
-    void Focus(double latitude, double longitude);
+    static glm::dvec3 EulerToDirection(double pitch, double yaw);
 
 private:
-    glm::dvec3 Target;
+    void Update();
+
+    glm::dvec3 Position;
+    glm::dvec3 Forward;
+    glm::dvec3 Up;
     glm::uvec2 Viewport;
     double Distance;
     double Pitch;

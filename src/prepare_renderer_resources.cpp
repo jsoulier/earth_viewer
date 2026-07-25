@@ -111,6 +111,22 @@ SDLPrepareRendererResources::SDLPrepareRendererResources(SDL_GPUDevice* device)
 {
 }
 
+CesiumGltf::Ktx2TranscodeTargets SDLPrepareRendererResources::GetKtx2TranscodeTargets() const
+{
+    const auto isValid = [this](SDL_GPUTextureFormat format)
+    {
+        return SDL_GPUTextureSupportsFormat(Device, format, SDL_GPU_TEXTURETYPE_2D, SDL_GPU_TEXTUREUSAGE_SAMPLER);
+    };
+    CesiumGltf::SupportedGpuCompressedPixelFormats formats{};
+    formats.BC1_RGB = isValid(SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM) && isValid(SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM_SRGB);
+    formats.BC3_RGBA = isValid(SDL_GPU_TEXTUREFORMAT_BC3_RGBA_UNORM) && isValid(SDL_GPU_TEXTUREFORMAT_BC3_RGBA_UNORM_SRGB);
+    formats.BC4_R = isValid(SDL_GPU_TEXTUREFORMAT_BC4_R_UNORM);
+    formats.BC5_RG = isValid(SDL_GPU_TEXTUREFORMAT_BC5_RG_UNORM);
+    formats.BC7_RGBA = isValid(SDL_GPU_TEXTUREFORMAT_BC7_RGBA_UNORM) && isValid(SDL_GPU_TEXTUREFORMAT_BC7_RGBA_UNORM_SRGB);
+    formats.ASTC_4x4_RGBA = isValid(SDL_GPU_TEXTUREFORMAT_ASTC_4x4_UNORM) && isValid(SDL_GPU_TEXTUREFORMAT_ASTC_4x4_UNORM_SRGB);
+    return CesiumGltf::Ktx2TranscodeTargets(formats, false);
+}
+
 CesiumAsync::Future<Cesium3DTilesSelection::TileLoadResultAndRenderResources> SDLPrepareRendererResources::prepareInLoadThread(
     const CesiumAsync::AsyncSystem& asyncSystem,
     Cesium3DTilesSelection::TileLoadResult&& tileLoadResult,

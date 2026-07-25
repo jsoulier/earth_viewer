@@ -28,7 +28,6 @@ public:
     Cesium3DTilesSelection::TilesetOptions TilesetOptions;
     CesiumRasterOverlays::RasterOverlayOptions RasterOverlayOptions;
     std::shared_ptr<SDLPrepareRendererResources> PrepareRendererResources;
-    std::filesystem::path IonTokenPath;
     int64_t IonAssetID;
     int64_t IonImageryID;
 };

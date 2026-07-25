@@ -1,5 +1,7 @@
 #include <Cesium3DTilesSelection/Tileset.h>
 #include <Cesium3DTilesSelection/TilesetExternals.h>
+#include <CesiumAsync/CachingAssetAccessor.h>
+#include <CesiumAsync/SqliteCache.h>
 #include <CesiumCurl/CurlAssetAccessor.h>
 #include <CesiumUtility/CreditSystem.h>
 #include <SDL3/SDL.h>
@@ -47,7 +49,6 @@ namespace CesiumRasterOverlays
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
     SDLTilesetConfig,
-    IonTokenPath,
     IonAssetID,
     IonImageryID,
     TilesetOptions,
@@ -57,6 +58,7 @@ static constexpr int kDefaultIonAssetID = 2275207;
 static constexpr int kDefaultIonImageryID = -1;
 static constexpr const char* kConfigFileName = "tileset_config.json";
 static constexpr const char* kDefaultIonTokenFileName = "cesium_ion_token.txt";
+static constexpr const char* kDatabaseFileName = "tileset.sqlite3";
 static constexpr double kZero = 0.0;
 static constexpr double kMaxSSE = 256.0;
 static constexpr double kMaxRasterSSE = 64.0;
@@ -68,9 +70,17 @@ static constexpr int64_t kMinCacheMB = 0;
 static constexpr int64_t kMaxCacheMB = 65536;
 static constexpr int kMinRasterTextureSize = 64;
 static constexpr int kMaxRasterTextureSize = 8192;
+static constexpr int kMaxDatabaseCacheItems = 16384;
 
-static std::string GetIonToken(const std::filesystem::path& path) 
+static std::string GetIonToken()
 {
+    const char* home = SDL_GetUserFolder(SDL_FOLDER_HOME);
+    if (!home)
+    {
+        SDL_Log("Failed to get home folder: %s", SDL_GetError());
+        return "";
+    }
+    std::filesystem::path path = std::filesystem::path(home) / kDefaultIonTokenFileName;
     std::ifstream file(path);
     if (!file.is_open())
     {
@@ -91,6 +101,19 @@ static std::string GetIonToken(const std::filesystem::path& path)
     return token;
 }
 
+static std::string GetCacheDatabasePath()
+{
+    char* prefPath = SDL_GetPrefPath("jsoulier", "sdl_earth_viewer");
+    if (!prefPath)
+    {
+        SDL_Log("Failed to get cache database folder: %s", SDL_GetError());
+        return kDatabaseFileName;
+    }
+    const std::filesystem::path path = std::filesystem::path(prefPath) / kDatabaseFileName;
+    SDL_free(prefPath);
+    return path.string();
+}
+
 SDLTilesetConfig::SDLTilesetConfig()
     : IonAssetID{kDefaultIonAssetID}
     , IonImageryID{kDefaultIonImageryID}
@@ -99,11 +122,6 @@ SDLTilesetConfig::SDLTilesetConfig()
     {
         SDL_Log("%s", details.message.data());
     };
-    const char* home = SDL_GetUserFolder(SDL_FOLDER_HOME);
-    if (home)
-    {
-        IonTokenPath = std::filesystem::path(home) / kDefaultIonTokenFileName;
-    }
 }
 
 SDLTilesetConfig SDLTilesetConfig::Load()
@@ -123,7 +141,7 @@ SDLTilesetConfig SDLTilesetConfig::Load()
     {
         SDL_Log("Failed to load %s: %s", kConfigFileName, e.what());
     }
-    return SDLTilesetConfig();
+    return {};
 }
 
 void SDLTilesetConfig::Save() const
@@ -142,31 +160,26 @@ void SDLTilesetConfig::Save() const
 
 bool SDLTilesetConfig::RenderImGui()
 {
-    int ionAssetID = static_cast<int>(IonAssetID);
+    int ionAssetID = IonAssetID;
     if (ImGui::InputInt("Ion Asset ID", &ionAssetID))
     {
         IonAssetID = ionAssetID;
     }
-    int ionImageryID = static_cast<int>(IonImageryID);
+    int ionImageryID = IonImageryID;
     if (ImGui::InputInt("Ion Imagery ID", &ionImageryID))
     {
         IonImageryID = ionImageryID;
     }
-    std::string ionTokenPath = IonTokenPath.string();
-    if (ImGui::InputText("Ion Token Path", &ionTokenPath))
-    {
-        IonTokenPath = std::filesystem::path(ionTokenPath);
-    }
     ImGui::DragScalar("Maximum SSE", ImGuiDataType_Double, &TilesetOptions.maximumScreenSpaceError, 0.1f, &kZero, &kMaxSSE);
-    int maxTileLoads = static_cast<int>(TilesetOptions.maximumSimultaneousTileLoads);
+    int maxTileLoads = TilesetOptions.maximumSimultaneousTileLoads;
     if (ImGui::DragInt("Max Tile Loads", &maxTileLoads, 1.0f, kMinTileLoads, kMaxTileLoads))
     {
-        TilesetOptions.maximumSimultaneousTileLoads = static_cast<uint32_t>(maxTileLoads);
+        TilesetOptions.maximumSimultaneousTileLoads = maxTileLoads;
     }
-    int loadingLimit = static_cast<int>(TilesetOptions.loadingDescendantLimit);
+    int loadingLimit = TilesetOptions.loadingDescendantLimit;
     if (ImGui::DragInt("Loading Descendant Limit", &loadingLimit, 1.0f, kMinDescendantLimit, kMaxDescendantLimit))
     {
-        TilesetOptions.loadingDescendantLimit = static_cast<uint32_t>(loadingLimit);
+        TilesetOptions.loadingDescendantLimit = loadingLimit;
     }
     int64_t maxCachedMB = TilesetOptions.maximumCachedBytes / (1024 * 1024);
     if (ImGui::DragScalar("Max Cache (MB)", ImGuiDataType_S64, &maxCachedMB, 1.0f, &kMinCacheMB, &kMaxCacheMB))
@@ -181,12 +194,12 @@ bool SDLTilesetConfig::RenderImGui()
     ImGui::Checkbox("Fog Culling", &TilesetOptions.enableFogCulling);
     ImGui::DragInt("Max Texture Size", &RasterOverlayOptions.maximumTextureSize, 1.0f, kMinRasterTextureSize, kMaxRasterTextureSize);
     ImGui::DragScalar("Max SSE", ImGuiDataType_Double, &RasterOverlayOptions.maximumScreenSpaceError, 0.1f, &kZero, &kMaxRasterSSE);
-    if (ImGui::Button("Save Config"))
+    if (ImGui::Button("Save"))
     {
         Save();
     }
     ImGui::SameLine();
-    return ImGui::Button("Recreate");
+    return ImGui::Button("Create");
 }
 
 SDLTileset::SDLTileset()
@@ -196,10 +209,7 @@ SDLTileset::SDLTileset()
 
 const Cesium3DTilesSelection::ViewUpdateResult& SDLTileset::Update(const SDLCamera& camera)
 {
-    if (camera.IsValid())
-    {
-        Tileset->updateViewGroup(Tileset->getDefaultViewGroup(), {camera.GetViewState()});
-    }
+    Tileset->updateViewGroup(Tileset->getDefaultViewGroup(), {camera.GetViewState()});
     Tileset->loadTiles();
     AsyncSystem.dispatchMainThreadTasks();
     return Tileset->getDefaultViewGroup().getViewUpdateResult();
@@ -212,7 +222,7 @@ std::shared_ptr<SDLTileset> SDLTileset::Create(const SDLTilesetConfig& config)
         SDL_Log("Ion asset ID is invalid");
         return nullptr;
     }
-    const std::string ionToken = GetIonToken(config.IonTokenPath);
+    const std::string ionToken = GetIonToken();
     if (ionToken.empty())
     {
         SDL_Log("Ion token is empty");
@@ -222,11 +232,18 @@ std::shared_ptr<SDLTileset> SDLTileset::Create(const SDLTilesetConfig& config)
     std::shared_ptr<SDLLogSink<std::mutex>> logSink = std::make_shared<SDLLogSink<std::mutex>>();
     std::shared_ptr<spdlog::logger> logger = std::make_shared<spdlog::logger>("cesium", logSink);
     std::shared_ptr<SDLTaskProcessor> taskProcessor = std::make_shared<SDLTaskProcessor>();
-    std::shared_ptr<CesiumAsync::IAssetAccessor> assetAccessor = std::make_shared<CesiumCurl::CurlAssetAccessor>();
+    std::shared_ptr<CesiumAsync::IAssetAccessor> curlAssetAccessor = std::make_shared<CesiumCurl::CurlAssetAccessor>();
+    std::shared_ptr<CesiumAsync::ICacheDatabase> cacheDatabase = std::make_shared<CesiumAsync::SqliteCache>(logger, GetCacheDatabasePath(), kMaxDatabaseCacheItems);
+    std::shared_ptr<CesiumAsync::IAssetAccessor> cachingAssetAccessor = std::make_shared<CesiumAsync::CachingAssetAccessor>(logger, curlAssetAccessor, cacheDatabase);
     std::shared_ptr<CesiumUtility::CreditSystem> creditSystem = std::make_shared<CesiumUtility::CreditSystem>();
     tileset->AsyncSystem = CesiumAsync::AsyncSystem(taskProcessor);
-    Cesium3DTilesSelection::TilesetExternals externals{assetAccessor, config.PrepareRendererResources, tileset->AsyncSystem, creditSystem, logger};
-    tileset->Tileset = std::make_unique<Cesium3DTilesSelection::Tileset>(externals, config.IonAssetID, ionToken, config.TilesetOptions);
+    Cesium3DTilesSelection::TilesetExternals externals{cachingAssetAccessor, config.PrepareRendererResources, tileset->AsyncSystem, creditSystem, logger};
+    Cesium3DTilesSelection::TilesetOptions tilesetOptions = config.TilesetOptions;
+    if (config.PrepareRendererResources)
+    {
+        tilesetOptions.contentOptions.ktx2TranscodeTargets = config.PrepareRendererResources->GetKtx2TranscodeTargets();
+    }
+    tileset->Tileset = std::make_unique<Cesium3DTilesSelection::Tileset>(externals, config.IonAssetID, ionToken, tilesetOptions);
     if (config.IonImageryID != -1)
     {
         tileset->Tileset->getOverlays().add(new CesiumRasterOverlays::IonRasterOverlay("overlay", config.IonImageryID, ionToken, config.RasterOverlayOptions));
