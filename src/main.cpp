@@ -41,16 +41,19 @@ static bool CreateTilesetPipeline()
 {
     SDL_GPUColorTargetDescription targets[1]{};
     targets[0].format = SDL_GetGPUSwapchainTextureFormat(device, window);
-    SDL_GPUVertexAttribute attributes[3]{};
+    SDL_GPUVertexAttribute attributes[4]{};
     attributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
     attributes[0].location = 0;
     attributes[0].offset = offsetof(SDLPrepareRendererResourcesVertex, Position);
-    attributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
+    attributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
     attributes[1].location = 1;
-    attributes[1].offset = offsetof(SDLPrepareRendererResourcesVertex, TexCoord);
+    attributes[1].offset = offsetof(SDLPrepareRendererResourcesVertex, Normal);
     attributes[2].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
     attributes[2].location = 2;
-    attributes[2].offset = offsetof(SDLPrepareRendererResourcesVertex, Overlay0);
+    attributes[2].offset = offsetof(SDLPrepareRendererResourcesVertex, TexCoord);
+    attributes[3].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
+    attributes[3].location = 3;
+    attributes[3].offset = offsetof(SDLPrepareRendererResourcesVertex, Overlay0);
     SDL_GPUVertexBufferDescription buffers[1]{};
     buffers[0].pitch = sizeof(SDLPrepareRendererResourcesVertex);
     buffers[0].slot = 0;
@@ -61,7 +64,7 @@ static bool CreateTilesetPipeline()
     info.target_info.color_target_descriptions = targets;
     info.target_info.has_depth_stencil_target = true;
     info.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
-    info.vertex_input_state.num_vertex_attributes = 3;
+    info.vertex_input_state.num_vertex_attributes = 4;
     info.vertex_input_state.vertex_attributes = attributes;
     info.vertex_input_state.num_vertex_buffers = 1;
     info.vertex_input_state.vertex_buffer_descriptions = buffers;

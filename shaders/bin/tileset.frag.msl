@@ -27,35 +27,45 @@ struct main0_out
 struct main0_in
 {
     float3 in_var_TEXCOORD0 [[user(locn0)]];
-    float2 in_var_TEXCOORD1 [[user(locn1)]];
+    float3 in_var_TEXCOORD1 [[user(locn1)]];
     float2 in_var_TEXCOORD2 [[user(locn2)]];
+    float2 in_var_TEXCOORD3 [[user(locn3)]];
 };
 
 fragment main0_out main0(main0_in in [[stage_in]], constant type_UniformBuffer& UniformBuffer [[buffer(0)]], constant type_UniformBuffer_1& UniformBuffer_1 [[buffer(1)]], constant type_UniformBuffer_2& UniformBuffer_2 [[buffer(2)]], texture2d<float> ColorTexture [[texture(0)]], sampler ColorSampler [[sampler(0)]])
 {
     main0_out out = {};
-    float2 _67;
+    float2 _69;
     if (UniformBuffer_1.TileType == 0)
     {
-        _67 = in.in_var_TEXCOORD1;
+        _69 = in.in_var_TEXCOORD2;
     }
     else
     {
-        float2 _66;
+        float2 _68;
         if (UniformBuffer_1.TileType == 1)
         {
-            float2 _62 = (in.in_var_TEXCOORD2 * UniformBuffer.Scale) + UniformBuffer.Translation;
-            _62.y = 1.0 - _62.y;
-            _66 = _62;
+            float2 _64 = (in.in_var_TEXCOORD3 * UniformBuffer.Scale) + UniformBuffer.Translation;
+            _64.y = 1.0 - _64.y;
+            _68 = _64;
         }
         else
         {
-            _66 = float2(0.0);
+            _68 = float2(0.0);
         }
-        _67 = _66;
+        _69 = _68;
     }
-    float4 _71 = ColorTexture.sample(ColorSampler, _67);
-    out.out_var_SV_Target = float4(_71.xyz * (precise::max(0.0, dot(fast::normalize(in.in_var_TEXCOORD0), UniformBuffer_2.SunDirection.xyz)) + 0.0199999995529651641845703125), _71.w);
+    float4 _73 = ColorTexture.sample(ColorSampler, _69);
+    float3 _81;
+    if (dot(in.in_var_TEXCOORD1, in.in_var_TEXCOORD1) > 0.0)
+    {
+        _81 = fast::normalize(in.in_var_TEXCOORD1);
+    }
+    else
+    {
+        _81 = fast::normalize(in.in_var_TEXCOORD0);
+    }
+    out.out_var_SV_Target = float4(_73.xyz * (precise::max(0.0, dot(_81, UniformBuffer_2.SunDirection.xyz)) + 0.0199999995529651641845703125), _73.w);
     return out;
 }
 

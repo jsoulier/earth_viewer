@@ -25,26 +25,30 @@
 
 namespace Cesium3DTilesSelection
 {
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
-        TilesetOptions,
-        maximumScreenSpaceError,
-        maximumSimultaneousTileLoads,
-        loadingDescendantLimit,
-        maximumCachedBytes,
-        forbidHoles,
-        preloadAncestors,
-        preloadSiblings,
-        enableFrustumCulling,
-        enableOcclusionCulling,
-        enableFogCulling)
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
+    TilesetOptions,
+    maximumScreenSpaceError,
+    maximumSimultaneousTileLoads,
+    loadingDescendantLimit,
+    maximumCachedBytes,
+    forbidHoles,
+    preloadAncestors,
+    preloadSiblings,
+    enableFrustumCulling,
+    enableOcclusionCulling,
+    enableFogCulling)
+
 }
 
 namespace CesiumRasterOverlays
 {
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
-        RasterOverlayOptions,
-        maximumTextureSize,
-        maximumScreenSpaceError)
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
+    RasterOverlayOptions,
+    maximumTextureSize,
+    maximumScreenSpaceError)
+
 }
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(

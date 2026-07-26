@@ -173,6 +173,11 @@ CesiumAsync::Future<Cesium3DTilesSelection::TileLoadResultAndRenderResources> SD
                 SDL_Log("Failed to get position accessor");
                 return;
             }
+            const CesiumGltf::Accessor* normalAccessor = nullptr;
+            if (auto normalIt = primitive.attributes.find("NORMAL"); normalIt != primitive.attributes.end())
+            {
+                normalAccessor = CesiumGltf::Model::getSafe(&model.accessors, normalIt->second);
+            }
             const CesiumGltf::Accessor* overlay0Accessor = nullptr;
             if (auto overlay0It = primitive.attributes.find("_CESIUMOVERLAY_0"); overlay0It != primitive.attributes.end())
             {
@@ -246,10 +251,27 @@ CesiumAsync::Future<Cesium3DTilesSelection::TileLoadResultAndRenderResources> SD
                 {
                     auto position = positionView[i];
                     vertexData[i].Position = glm::vec3(position.value[0], position.value[1], position.value[2]);
+                    vertexData[i].Normal = glm::vec3(0.0f);
                     vertexData[i].TexCoord = glm::vec2(0.0f);
                     vertexData[i].Overlay0 = glm::vec2(0.0f);
                 }
             });
+            if (normalAccessor)
+            {
+                CesiumGltf::createAccessorView(model, *normalAccessor, [&](auto&& normalView)
+                {
+                    if (normalView.status() != CesiumGltf::AccessorViewStatus::Valid)
+                    {
+                        SDL_Log("Normal view was invalid");
+                        return;
+                    }
+                    for (uint32_t i = 0; i < std::min(numVertices, uint32_t(normalView.size())); i++)
+                    {
+                        auto normal = normalView[i];
+                        vertexData[i].Normal = glm::vec3(normal.value[0], normal.value[1], normal.value[2]);
+                    }
+                });
+            }
             if (texCoordAccessor)
             {
                 CesiumGltf::createAccessorView(model, *texCoordAccessor, [&](auto&& texCoordView)

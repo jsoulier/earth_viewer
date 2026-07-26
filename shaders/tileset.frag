@@ -2,8 +2,9 @@ struct Output
 {
     float4 Position : SV_Position;
     float3 WorldPosition : TEXCOORD0;
-    float2 TexCoord : TEXCOORD1;
-    float2 Overlay0 : TEXCOORD2;
+    float3 WorldNormal : TEXCOORD1;
+    float2 TexCoord : TEXCOORD2;
+    float2 Overlay0 : TEXCOORD3;
 };
 
 Texture2D ColorTexture : register(t0, space2);
@@ -42,7 +43,15 @@ float4 main(Output input) : SV_Target
         texcoord = float2(0.0f, 0.0f);
     }
     float4 color = ColorTexture.Sample(ColorSampler, texcoord);
-    float3 normal = normalize(input.WorldPosition);
+    float3 normal;
+    if (dot(input.WorldNormal, input.WorldNormal) > 0.0)
+    {
+        normal = normalize(input.WorldNormal);
+    }
+    else
+    {
+        normal = normalize(input.WorldPosition);
+    }
     float ambient = 0.02;
     float lighting = max(0.0, dot(normal, SunDirection.xyz)) + ambient;
     return float4(color.rgb * lighting, color.a);
