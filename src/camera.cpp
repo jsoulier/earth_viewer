@@ -19,7 +19,7 @@ static constexpr double kArcSpeed = 0.1e-9;
 static constexpr double kZoomSpeed = 0.1;
 static constexpr double kMinSpeed = 500.0;
 
-SDLCamera::SDLCamera()
+Camera::Camera()
     : Position{0.0, 0.0, 0.0}
     , Forward{0.0, -1.0, 0.0}
     , Up{kUp}
@@ -31,7 +31,7 @@ SDLCamera::SDLCamera()
     Update();
 }
 
-void SDLCamera::Handle(const SDL_Event& event)
+void Camera::Handle(const SDL_Event& event)
 {
     double altitude = glm::length(Position) - kEarthRadius;
     double speed = std::max(kMinSpeed, altitude);
@@ -56,74 +56,74 @@ void SDLCamera::Handle(const SDL_Event& event)
     }
 }
 
-void SDLCamera::Update()
+void Camera::Update()
 {
     Position = Distance * EulerToDirection(Pitch, Yaw);
     Forward = glm::normalize(-Position);
     Up = kUp;
 }
 
-void SDLCamera::Resize(int width, int height)
+void Camera::Resize(int width, int height)
 {
     Viewport = {width, height};
 }
 
-Cesium3DTilesSelection::ViewState SDLCamera::GetViewState() const
+Cesium3DTilesSelection::ViewState Camera::GetViewState() const
 {
     return Cesium3DTilesSelection::ViewState(GetViewMatrix(), GetProjMatrix(), glm::dvec2(Viewport));
 }
 
-glm::dmat4 SDLCamera::GetProjMatrix() const
+glm::dmat4 Camera::GetProjMatrix() const
 {
     return CesiumGeometry::Transforms::createPerspectiveMatrix(GetFovX(), kFovY, kNear, glm::length(GetPosition()));
 }
 
-glm::dmat4 SDLCamera::GetViewMatrix() const
+glm::dmat4 Camera::GetViewMatrix() const
 {
     return CesiumGeometry::Transforms::createViewMatrix(Position, Forward, Up);
 }
 
-glm::dvec3 SDLCamera::GetPosition() const
+glm::dvec3 Camera::GetPosition() const
 {
     return Position;
 }
 
-double SDLCamera::GetDistance() const
+double Camera::GetDistance() const
 {
     return Distance;
 }
 
-double SDLCamera::GetPitch() const
+double Camera::GetPitch() const
 {
     return Pitch;
 }
 
-double SDLCamera::GetYaw() const
+double Camera::GetYaw() const
 {
     return Yaw;
 }
 
-uint32_t SDLCamera::GetWidth() const
+uint32_t Camera::GetWidth() const
 {
     return Viewport.x;
 }
 
-uint32_t SDLCamera::GetHeight() const
+uint32_t Camera::GetHeight() const
 {
     return Viewport.y;
 }
 
-double SDLCamera::GetAspectRatio() const
+double Camera::GetAspectRatio() const
 {
     return double(Viewport.x) / double(Viewport.y);
 }
 
-double SDLCamera::GetFovX() const
+double Camera::GetFovX() const
 {
     return 2.0 * std::atan(std::tan(kFovY / 2.0) * GetAspectRatio());
 }
 
-glm::dvec3 SDLCamera::EulerToDirection(double pitch, double yaw)
+glm::dvec3 Camera::EulerToDirection(double pitch, double yaw)
 {
     return {std::cos(pitch) * std::cos(yaw), std::cos(pitch) * std::sin(yaw), std::sin(pitch)};
 }

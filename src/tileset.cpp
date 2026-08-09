@@ -52,7 +52,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
 }
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
-    SDLTilesetConfig,
+    TilesetConfig,
     IonAssetID,
     IonImageryID,
     TilesetOptions,
@@ -107,7 +107,7 @@ static std::string GetIonToken()
 
 static std::string GetCacheDatabasePath()
 {
-    char* prefPath = SDL_GetPrefPath("jsoulier", "sdl_earth_viewer");
+    char* prefPath = SDL_GetPrefPath("jsoulier", "earth_viewer");
     if (!prefPath)
     {
         SDL_Log("Failed to get cache database folder: %s", SDL_GetError());
@@ -118,7 +118,7 @@ static std::string GetCacheDatabasePath()
     return path.string();
 }
 
-SDLTilesetConfig::SDLTilesetConfig()
+TilesetConfig::TilesetConfig()
     : IonAssetID{kDefaultIonAssetID}
     , IonImageryID{kDefaultIonImageryID}
 {
@@ -128,18 +128,18 @@ SDLTilesetConfig::SDLTilesetConfig()
     };
 }
 
-SDLTilesetConfig SDLTilesetConfig::Load()
+TilesetConfig TilesetConfig::Load()
 {
     if (!std::filesystem::exists(kConfigFileName))
     {
-        return SDLTilesetConfig();
+        return TilesetConfig();
     }
     try
     {
         std::ifstream file(kConfigFileName);
         nlohmann::json json;
         file >> json;
-        return json.get<SDLTilesetConfig>();
+        return json.get<TilesetConfig>();
     }
     catch (const std::exception& e)
     {
@@ -148,7 +148,7 @@ SDLTilesetConfig SDLTilesetConfig::Load()
     return {};
 }
 
-void SDLTilesetConfig::Save() const
+void TilesetConfig::Save() const
 {
     try
     {
@@ -162,7 +162,7 @@ void SDLTilesetConfig::Save() const
     }
 }
 
-bool SDLTilesetConfig::RenderImGui()
+bool TilesetConfig::RenderImGui()
 {
     int ionAssetID = IonAssetID;
     if (ImGui::InputInt("Ion Asset ID", &ionAssetID))
@@ -206,20 +206,20 @@ bool SDLTilesetConfig::RenderImGui()
     return ImGui::Button("Create");
 }
 
-SDLTileset::SDLTileset()
+Tileset::Tileset()
 : AsyncSystem{nullptr}
 {
 }
 
-const Cesium3DTilesSelection::ViewUpdateResult& SDLTileset::Update(const SDLCamera& camera)
+const Cesium3DTilesSelection::ViewUpdateResult& Tileset::Update(const Camera& camera)
 {
-    Tileset->updateViewGroup(Tileset->getDefaultViewGroup(), {camera.GetViewState()});
-    Tileset->loadTiles();
+    TilesetHandle->updateViewGroup(TilesetHandle->getDefaultViewGroup(), {camera.GetViewState()});
+    TilesetHandle->loadTiles();
     AsyncSystem.dispatchMainThreadTasks();
-    return Tileset->getDefaultViewGroup().getViewUpdateResult();
+    return TilesetHandle->getDefaultViewGroup().getViewUpdateResult();
 }
 
-std::shared_ptr<SDLTileset> SDLTileset::Create(const SDLTilesetConfig& config)
+std::shared_ptr<Tileset> Tileset::Create(const TilesetConfig& config)
 {
     if (config.IonAssetID == -1)
     {
@@ -232,32 +232,32 @@ std::shared_ptr<SDLTileset> SDLTileset::Create(const SDLTilesetConfig& config)
         SDL_Log("Ion token is empty");
         return nullptr;
     }
-    std::shared_ptr<SDLTileset> tileset = std::make_shared<SDLTileset>();
-    std::shared_ptr<SDLLogSink<std::mutex>> logSink = std::make_shared<SDLLogSink<std::mutex>>();
+    std::shared_ptr<Tileset> tileset = std::make_shared<Tileset>();
+    std::shared_ptr<LogSink<std::mutex>> logSink = std::make_shared<LogSink<std::mutex>>();
     std::shared_ptr<spdlog::logger> logger = std::make_shared<spdlog::logger>("cesium", logSink);
-    std::shared_ptr<SDLTaskProcessor> taskProcessor = std::make_shared<SDLTaskProcessor>();
+    std::shared_ptr<TaskProcessor> taskProcessor = std::make_shared<TaskProcessor>();
     std::shared_ptr<CesiumAsync::IAssetAccessor> curlAssetAccessor = std::make_shared<CesiumCurl::CurlAssetAccessor>();
     std::shared_ptr<CesiumAsync::ICacheDatabase> cacheDatabase = std::make_shared<CesiumAsync::SqliteCache>(logger, GetCacheDatabasePath(), kMaxDatabaseCacheItems);
     std::shared_ptr<CesiumAsync::IAssetAccessor> cachingAssetAccessor = std::make_shared<CesiumAsync::CachingAssetAccessor>(logger, curlAssetAccessor, cacheDatabase);
     std::shared_ptr<CesiumUtility::CreditSystem> creditSystem = std::make_shared<CesiumUtility::CreditSystem>();
     tileset->AsyncSystem = CesiumAsync::AsyncSystem(taskProcessor);
-    Cesium3DTilesSelection::TilesetExternals externals{cachingAssetAccessor, config.PrepareRendererResources, tileset->AsyncSystem, creditSystem, logger};
+    Cesium3DTilesSelection::TilesetExternals externals{cachingAssetAccessor, config.PrepareRendererResourcesHandle, tileset->AsyncSystem, creditSystem, logger};
     Cesium3DTilesSelection::TilesetOptions tilesetOptions = config.TilesetOptions;
-    if (config.PrepareRendererResources)
+    if (config.PrepareRendererResourcesHandle)
     {
-        tilesetOptions.contentOptions.ktx2TranscodeTargets = config.PrepareRendererResources->GetKtx2TranscodeTargets();
+        tilesetOptions.contentOptions.ktx2TranscodeTargets = config.PrepareRendererResourcesHandle->GetKtx2TranscodeTargets();
     }
-    tileset->Tileset = std::make_unique<Cesium3DTilesSelection::Tileset>(externals, config.IonAssetID, ionToken, tilesetOptions);
+    tileset->TilesetHandle = std::make_unique<Cesium3DTilesSelection::Tileset>(externals, config.IonAssetID, ionToken, tilesetOptions);
     if (config.IonImageryID != -1)
     {
-        tileset->Tileset->getOverlays().add(new CesiumRasterOverlays::IonRasterOverlay("overlay", config.IonImageryID, ionToken, config.RasterOverlayOptions));
+        tileset->TilesetHandle->getOverlays().add(new CesiumRasterOverlays::IonRasterOverlay("overlay", config.IonImageryID, ionToken, config.RasterOverlayOptions));
     }
     return tileset;
 }
 
-void SDLTileset::RenderImGui() const
+void Tileset::RenderImGui() const
 {
-    const Cesium3DTilesSelection::ViewUpdateResult& result = Tileset->getDefaultViewGroup().getViewUpdateResult();
+    const Cesium3DTilesSelection::ViewUpdateResult& result = TilesetHandle->getDefaultViewGroup().getViewUpdateResult();
     ImGui::Text("Tiles to Render: %zu", result.tilesToRenderThisFrame.size());
     ImGui::Text("Tiles Visited: %u", result.tilesVisited);
     ImGui::Text("Tiles Culled: %u", result.tilesCulled);

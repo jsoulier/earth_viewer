@@ -1,4 +1,4 @@
-# SDL Earth Viewer
+# Earth Viewer
 
 Earth Viewer using SDL3 GPU and Cesium Native
 
@@ -55,7 +55,7 @@ cd build
 cmake ..
 cmake --build . --parallel 8 --config Release
 cd bin
-./sdl_earth_viewer.exe
+./earth_viewer.exe
 ```
 
 #### Linux
@@ -68,7 +68,7 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --parallel 8
 cd bin
-./sdl_earth_viewer
+./earth_viewer
 ```
 
 #### Shaders

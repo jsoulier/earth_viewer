@@ -5,7 +5,7 @@
 #include <spdlog/spdlog.h>
 
 template<typename Mutex>
-class SDLLogSink : public spdlog::sinks::base_sink<Mutex>
+class LogSink : public spdlog::sinks::base_sink<Mutex>
 {
 protected:
     void sink_it_(const spdlog::details::log_msg& msg) override

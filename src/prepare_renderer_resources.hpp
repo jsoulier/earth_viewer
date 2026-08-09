@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <vector>
 
-struct SDLPrepareRendererResourcesVertex
+struct RendererVertex
 {
     glm::vec3 Position;
     glm::vec3 Normal;
@@ -16,7 +16,7 @@ struct SDLPrepareRendererResourcesVertex
     glm::vec2 Overlay0;
 };
 
-struct SDLPrepareRendererResourcesPrimitive
+struct RendererPrimitive
 {
     SDL_GPUBuffer* VertexBuffer;
     SDL_GPUBuffer* IndexBuffer;
@@ -27,23 +27,23 @@ struct SDLPrepareRendererResourcesPrimitive
     glm::dmat4 Transform;
 };
 
-struct SDLPrepareRendererResourcesOverlay
+struct RendererOverlay
 {
     SDL_GPUTexture* Texture;
     glm::dvec2 Translation;
     glm::dvec2 Scale;
 };
 
-struct SDLPrepareRendererResourcesTile
+struct TileRendererResources
 {
-    std::vector<SDLPrepareRendererResourcesPrimitive> Primitives;
-    std::vector<SDLPrepareRendererResourcesOverlay> Overlays;
+    std::vector<RendererPrimitive> Primitives;
+    std::vector<RendererOverlay> Overlays;
 };
 
-class SDLPrepareRendererResources : public Cesium3DTilesSelection::IPrepareRendererResources
+class PrepareRendererResources : public Cesium3DTilesSelection::IPrepareRendererResources
 {
 public:
-    SDLPrepareRendererResources(SDL_GPUDevice* device);
+    PrepareRendererResources(SDL_GPUDevice* device);
     CesiumGltf::Ktx2TranscodeTargets GetKtx2TranscodeTargets() const;
     CesiumAsync::Future<Cesium3DTilesSelection::TileLoadResultAndRenderResources> prepareInLoadThread(
         const CesiumAsync::AsyncSystem& asyncSystem,

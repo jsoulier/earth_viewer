@@ -4,10 +4,10 @@
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 
-class SDLCamera
+class Camera
 {
 public:
-    SDLCamera();
+    Camera();
     void Handle(const SDL_Event& event);
     void Resize(int width, int height);
     Cesium3DTilesSelection::ViewState GetViewState() const;

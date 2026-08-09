@@ -29,10 +29,10 @@ static SDL_GPUGraphicsPipeline* atmospherePipeline;
 static SDL_GPUGraphicsPipeline* spacePipeline;
 static SDL_GPUTexture* defaultTexture;
 static SDL_GPUSampler* defaultSampler;
-static std::shared_ptr<SDLPrepareRendererResources> prepareRendererResources;
-static SDLTilesetConfig tilesetConfig;
-static std::shared_ptr<SDLTileset> tileset;
-static SDLCamera camera;
+static std::shared_ptr<PrepareRendererResources> prepareRendererResources;
+static TilesetConfig tilesetConfig;
+static std::shared_ptr<Tileset> tileset;
+static Camera camera;
 static uint64_t time1;
 static uint64_t time2;
 static float dt;
@@ -44,18 +44,18 @@ static bool CreateTilesetPipeline()
     SDL_GPUVertexAttribute attributes[4]{};
     attributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
     attributes[0].location = 0;
-    attributes[0].offset = offsetof(SDLPrepareRendererResourcesVertex, Position);
+    attributes[0].offset = offsetof(RendererVertex, Position);
     attributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
     attributes[1].location = 1;
-    attributes[1].offset = offsetof(SDLPrepareRendererResourcesVertex, Normal);
+    attributes[1].offset = offsetof(RendererVertex, Normal);
     attributes[2].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
     attributes[2].location = 2;
-    attributes[2].offset = offsetof(SDLPrepareRendererResourcesVertex, TexCoord);
+    attributes[2].offset = offsetof(RendererVertex, TexCoord);
     attributes[3].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
     attributes[3].location = 3;
-    attributes[3].offset = offsetof(SDLPrepareRendererResourcesVertex, Overlay0);
+    attributes[3].offset = offsetof(RendererVertex, Overlay0);
     SDL_GPUVertexBufferDescription buffers[1]{};
-    buffers[0].pitch = sizeof(SDLPrepareRendererResourcesVertex);
+    buffers[0].pitch = sizeof(RendererVertex);
     buffers[0].slot = 0;
     SDL_GPUGraphicsPipelineCreateInfo info{};
     info.vertex_shader = LoadShader(device, "tileset.vert");
@@ -216,13 +216,13 @@ static bool Init()
     SDL_SetLogPriorities(SDL_LOG_PRIORITY_VERBOSE);
 #endif
     Cesium3DTilesContent::registerAllTileContentTypes();
-    SDL_SetAppMetadata("SDL Earth Viewer", nullptr, nullptr);
+    SDL_SetAppMetadata("Earth Viewer", nullptr, nullptr);
     if (!SDL_Init(SDL_INIT_VIDEO))
     {
         SDL_Log("Failed to initialize SDL: %s", SDL_GetError());
         return false;
     }
-    window = SDL_CreateWindow("SDL Earth Viewer", 960, 720, SDL_WINDOW_HIDDEN);
+    window = SDL_CreateWindow("Earth Viewer", 960, 720, SDL_WINDOW_HIDDEN);
     if (!window)
     {
         SDL_Log("Failed to create window: %s", SDL_GetError());
@@ -280,10 +280,10 @@ static bool Init()
         SDL_Log("Failed to create default raster overlay");
         return false;
     }
-    prepareRendererResources = std::make_shared<SDLPrepareRendererResources>(device);
-    tilesetConfig = SDLTilesetConfig::Load();
-    tilesetConfig.PrepareRendererResources = prepareRendererResources;
-    tileset = SDLTileset::Create(tilesetConfig);
+    prepareRendererResources = std::make_shared<PrepareRendererResources>(device);
+    tilesetConfig = TilesetConfig::Load();
+    tilesetConfig.PrepareRendererResourcesHandle = prepareRendererResources;
+    tileset = Tileset::Create(tilesetConfig);
     if (!tileset)
     {
         SDL_Log("Failed to create tileset");
@@ -385,7 +385,7 @@ static void Render()
     glm::dmat4 viewProjMatrix = projMatrix * viewMatrix;
     glm::mat4 inverseViewProj = glm::inverse(glm::mat4(viewProjMatrix));
     glm::vec4 cameraPosition = glm::vec4(camera.GetPosition(), 1.0f);
-    glm::vec3 sunDirection = glm::vec3(SDLCamera::EulerToDirection(camera.GetPitch() + kSunPitch, camera.GetYaw() + kSunYaw));
+    glm::vec3 sunDirection = glm::vec3(Camera::EulerToDirection(camera.GetPitch() + kSunPitch, camera.GetYaw() + kSunYaw));
     {
         DebugGroupBlock(commandBuffer, "Render::Space");
         SDL_GPUColorTargetInfo colorInfo{};
@@ -434,7 +434,7 @@ static void Render()
                 {
                     continue;
                 }
-                const SDLPrepareRendererResourcesTile* resources = static_cast<SDLPrepareRendererResourcesTile*>(content->getRenderResources());
+                const TileRendererResources* resources = static_cast<TileRendererResources*>(content->getRenderResources());
                 if (!resources)
                 {
                     continue;
@@ -442,12 +442,12 @@ static void Render()
                 SDL_GPUTextureSamplerBinding samplerBinding{};
                 samplerBinding.texture = defaultTexture;
                 samplerBinding.sampler = defaultSampler;
-                const SDLPrepareRendererResourcesOverlay* overlay = nullptr;
+                const RendererOverlay* overlay = nullptr;
                 if (!resources->Overlays.empty())
                 {
                     overlay = &resources->Overlays.back();
                 }
-                for (const SDLPrepareRendererResourcesPrimitive& primitive : resources->Primitives)
+                for (const RendererPrimitive& primitive : resources->Primitives)
                 {
                     glm::mat4 mvp = glm::mat4(viewProjMatrix * primitive.Transform);
                     glm::mat4 model = glm::mat4(primitive.Transform);
@@ -536,7 +536,7 @@ static void Render()
         ImGui::SeparatorText("Tileset Config");
         if (tilesetConfig.RenderImGui())
         {
-            std::shared_ptr<SDLTileset> newTileset = SDLTileset::Create(tilesetConfig);
+            std::shared_ptr<Tileset> newTileset = Tileset::Create(tilesetConfig);
             if (newTileset)
             {
                 tileset = newTileset;

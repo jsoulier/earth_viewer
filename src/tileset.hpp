@@ -13,34 +13,34 @@
 #include <string>
 #include <string_view>
 
-class SDLCamera;
-class SDLPrepareRendererResources;
-class SDLTaskProcessor;
+class Camera;
+class PrepareRendererResources;
+class TaskProcessor;
 
-class SDLTilesetConfig
+class TilesetConfig
 {
 public:
-    SDLTilesetConfig();
-    static SDLTilesetConfig Load();
+    TilesetConfig();
+    static TilesetConfig Load();
     void Save() const;
     bool RenderImGui();
 
     Cesium3DTilesSelection::TilesetOptions TilesetOptions;
     CesiumRasterOverlays::RasterOverlayOptions RasterOverlayOptions;
-    std::shared_ptr<SDLPrepareRendererResources> PrepareRendererResources;
+    std::shared_ptr<PrepareRendererResources> PrepareRendererResourcesHandle;
     int64_t IonAssetID;
     int64_t IonImageryID;
 };
 
-class SDLTileset
+class Tileset
 {
 public:
-    SDLTileset();
-    const Cesium3DTilesSelection::ViewUpdateResult& Update(const SDLCamera& camera);
-    static std::shared_ptr<SDLTileset> Create(const SDLTilesetConfig& config);
+    Tileset();
+    const Cesium3DTilesSelection::ViewUpdateResult& Update(const Camera& camera);
+    static std::shared_ptr<Tileset> Create(const TilesetConfig& config);
     void RenderImGui() const;
 
 private:
-    std::unique_ptr<Cesium3DTilesSelection::Tileset> Tileset;
+    std::unique_ptr<Cesium3DTilesSelection::Tileset> TilesetHandle;
     CesiumAsync::AsyncSystem AsyncSystem;
 };
