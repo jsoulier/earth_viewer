@@ -380,6 +380,7 @@ static void Render()
         SDL_SubmitGPUCommandBuffer(commandBuffer);
         return;
     }
+    camera.Update(tileset);
     glm::dmat4 viewMatrix = camera.GetViewMatrix();
     glm::dmat4 projMatrix = camera.GetProjMatrix();
     glm::dmat4 viewProjMatrix = projMatrix * viewMatrix;
@@ -523,7 +524,7 @@ static void Render()
         ImGui::Text("Driver: %s", SDL_GetGPUDeviceDriver(device));
         ImGui::Text("FPS: %.1f (%.2f ms)", 1e9f / dt, dt / 1e6f);
         ImGui::Text("Position: %.1f, %.1f, %.1f", cameraPosition.x, cameraPosition.y, cameraPosition.z);
-        ImGui::Text("Distance: %.1f km", camera.GetDistance() / 1e3);
+        ImGui::Text("Distance: %.1f km", camera.GetHeight() / 1e3);
         ImGui::Text("Pitch: %.2f, Yaw: %.2f", glm::degrees(camera.GetPitch()), glm::degrees(camera.GetYaw()));
         if (tileset)
         {

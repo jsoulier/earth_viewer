@@ -1,13 +1,16 @@
 #include <Cesium3DTilesSelection/ViewState.h>
 #include <CesiumGeometry/Transforms.h>
+#include <CesiumGeospatial/Ellipsoid.h>
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 
 #include <algorithm>
 #include <cmath>
+#include <exception>
 #include <limits>
 
 #include "camera.hpp"
+#include "tileset.hpp"
 
 static constexpr glm::dvec3 kUp = glm::dvec3(0.0, 0.0, 1.0);
 static constexpr double kMaxPitch = glm::pi<double>() / 2.0 - 0.001;
@@ -18,6 +21,7 @@ static constexpr double kEarthRadius = 6378.137e3;
 static constexpr double kArcSpeed = 0.1e-9;
 static constexpr double kZoomSpeed = 0.1;
 static constexpr double kMinSpeed = 500.0;
+static constexpr double kMinAltitude = 2.0;
 
 Camera::Camera()
     : Position{0.0, 0.0, 0.0}
@@ -25,16 +29,16 @@ Camera::Camera()
     , Up{kUp}
     , Viewport{0, 0}
     , Distance{20000.0e3}
+    , MinDistance{kEarthRadius}
     , Pitch{0.0}
     , Yaw{glm::half_pi<double>()}
 {
-    Update();
+    Update(nullptr);
 }
 
 void Camera::Handle(const SDL_Event& event)
 {
-    double altitude = glm::length(Position) - kEarthRadius;
-    double speed = std::max(kMinSpeed, altitude);
+    double speed = std::max(Distance - MinDistance, 0.0);
     switch (event.type)
     {
     case SDL_EVENT_MOUSE_MOTION:
@@ -43,24 +47,45 @@ void Camera::Handle(const SDL_Event& event)
         {
             Yaw -= event.motion.xrel * speed * kArcSpeed;
             Pitch = std::clamp(Pitch + event.motion.yrel * speed * kArcSpeed, -kMaxPitch, kMaxPitch);
-            Update();
         }
         break;
     }
     case SDL_EVENT_MOUSE_WHEEL:
     {
         Distance -= event.wheel.y * speed * kZoomSpeed;
-        Update();
         break;
     }
     }
 }
 
-void Camera::Update()
+void Camera::Update(const std::shared_ptr<Tileset>& tileset)
 {
-    Position = Distance * EulerToDirection(Pitch, Yaw);
+    if (Future && Future->isReady())
+    {
+        try
+        {
+            Cesium3DTilesSelection::SampleHeightResult result = Future->wait();
+            if (!result.sampleSuccess.empty() && result.sampleSuccess[0])
+            {
+                MinDistance = glm::length(CesiumGeospatial::Ellipsoid::WGS84.cartographicToCartesian(result.positions[0]));
+            }
+        }
+        catch (const std::exception& exception)
+        {
+            SDL_Log("Failed to sample height: %s", exception.what());
+        }
+        Future.reset();
+    }
+    glm::dvec3 direction = EulerToDirection(Pitch, Yaw);
+    Distance = std::max(Distance, MinDistance + kMinAltitude);
+    Position = Distance * direction;
     Forward = glm::normalize(-Position);
     Up = kUp;
+    std::optional<CesiumGeospatial::Cartographic> cartographic = CesiumGeospatial::Ellipsoid::WGS84.cartesianToCartographic(Position);
+    if (cartographic && tileset && !Future)
+    {
+        Future = tileset->Sample(*cartographic);
+    }
 }
 
 void Camera::Resize(int width, int height)

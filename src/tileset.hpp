@@ -1,8 +1,11 @@
 #pragma once
 
+#include <Cesium3DTilesSelection/SampleHeightResult.h>
 #include <Cesium3DTilesSelection/Tileset.h>
 #include <Cesium3DTilesSelection/TilesetExternals.h>
+#include <CesiumAsync/Future.h>
 #include <CesiumCurl/CurlAssetAccessor.h>
+#include <CesiumGeospatial/Cartographic.h>
 #include <CesiumRasterOverlays/IonRasterOverlay.h>
 #include <CesiumUtility/CreditSystem.h>
 #include <nlohmann/json.hpp>
@@ -37,6 +40,7 @@ class Tileset
 public:
     Tileset();
     const Cesium3DTilesSelection::ViewUpdateResult& Update(const Camera& camera);
+    CesiumAsync::Future<Cesium3DTilesSelection::SampleHeightResult> Sample(const CesiumGeospatial::Cartographic& position);
     static std::shared_ptr<Tileset> Create(const TilesetConfig& config);
     void RenderImGui() const;
 

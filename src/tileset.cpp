@@ -219,6 +219,11 @@ const Cesium3DTilesSelection::ViewUpdateResult& Tileset::Update(const Camera& ca
     return TilesetHandle->getDefaultViewGroup().getViewUpdateResult();
 }
 
+CesiumAsync::Future<Cesium3DTilesSelection::SampleHeightResult> Tileset::Sample(const CesiumGeospatial::Cartographic& position)
+{
+    return TilesetHandle->sampleHeightMostDetailed({position});
+}
+
 std::shared_ptr<Tileset> Tileset::Create(const TilesetConfig& config)
 {
     if (config.IonAssetID == -1)
